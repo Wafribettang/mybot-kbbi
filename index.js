@@ -4,7 +4,7 @@ const cheerio = require('cheerio');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-async function scrapeKBBI(kata) {
+async function scrapeKBBI(kata, isRetry = false) {
     try {
         const url = `https://kbbi.kemendikdasmen.go.id/entri/${encodeURIComponent(kata)}`;
         const { data } = await axios.get(url, {
@@ -76,6 +76,16 @@ async function scrapeKBBI(kata) {
 
         // Push entri terakhir ke hasil
         if (currentEntri) hasil.push(currentEntri);
+
+        // --- LOGIKA LONCAT START ---
+        if (!isRetry && hasil.length > 0 && hasil[0].makna.length > 0) {
+            const maknaPertama = hasil[0].makna[0];
+            if (maknaPertama.includes('→')) {
+                const kataBaku = maknaPertama.replace('→', '').trim().split(' ')[0];
+                return await scrapeKBBI(kataBaku, true); 
+            }
+        }
+        // --- LOGIKA LONCAT END ---
 
         // Jika hasil kosong tapi tidak ada pesan error dari KBBI
         if (hasil.length === 0) return { error: "Kata tidak ditemukan" };
