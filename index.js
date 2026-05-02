@@ -24,13 +24,26 @@ async function scrapeKBBI(kata) {
             const tagName = el.tagName;
 
             // 1. Deteksi Judul Kata (H2)
-            if (tagName === 'h2') {
+                        if (tagName === 'h2') {
                 if (currentEntri) hasil.push(currentEntri);
+                
+                const judul = $(el);
                 currentEntri = {
-                    nama: $(el).contents().filter(function() { return this.nodeType === 3; }).text().trim(),
-                    nomor: $(el).find('sup').text().trim() || null,
+                    nama: judul.contents().filter(function() { return this.nodeType === 3; }).text().trim(),
+                    nomor: judul.find('sup').text().trim() || null,
                     makna: []
                 };
+
+                // TRIK BARU: Ambil teks "prakategorial" atau info tambahan tepat setelah H2
+                // Jika setelah H2 ada tag <font> atau <i> sebelum ketemu <ol>/<ul>
+                let nextElem = judul.next();
+                while (nextElem.length && !['h2', 'ol', 'ul', 'hr'].includes(nextElem[0].tagName)) {
+                    let infoTeks = nextElem.text().trim();
+                    if (infoTeks && infoTeks.length > 3) {
+                        currentEntri.makna.push(infoTeks);
+                    }
+                    nextElem = nextElem.next();
+                }
             }
 
             // 2. Deteksi Daftar Makna (OL atau UL)
