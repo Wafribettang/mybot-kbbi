@@ -23,10 +23,8 @@ async function scrapeKBBI(kata, isRetry = false) {
         $('.container.body-content').contents().each((i, el) => {
             const tagName = el.tagName;
 
-            // 1. Deteksi Judul Kata (H2)
-                        if (tagName === 'h2') {
+            if (tagName === 'h2') {
                 if (currentEntri) hasil.push(currentEntri);
-                
                 const judul = $(el);
                 currentEntri = {
                     nama: judul.contents().filter(function() { return this.nodeType === 3; }).text().trim(),
@@ -34,39 +32,31 @@ async function scrapeKBBI(kata, isRetry = false) {
                     makna: []
                 };
 
-                // TRIK BARU: Ambil teks "prakategorial" atau info tambahan tepat setelah H2
-                // Jika setelah H2 ada tag <font> atau <i> sebelum ketemu <ol>/<ul>
+                // Ambil info setelah H2 (Prakategorial dll)
                 let nextElem = judul.next();
                 while (nextElem.length && !['h2', 'ol', 'ul', 'hr'].includes(nextElem[0].tagName)) {
-                    let infoTeks = nextElem.text().trim();
-                    if (infoTeks && infoTeks.length > 3) {
+                    // Hapus link Tesaurus di tahap ini
+                    nextElem.find('a:contains("Tesaurus"), .entrisButton').remove();
+                    
+                    let infoTeks = nextElem.text().trim().replace(/\s+/g, ' ');
+                    
+                    // Filter: Jangan masukkan jika teks mengandung Tesaurus atau cuma simbol panah
+                    if (infoTeks && !infoTeks.includes('Tesaurus') && infoTeks.length > 1) {
                         currentEntri.makna.push(infoTeks);
                     }
                     nextElem = nextElem.next();
                 }
             }
 
-            // 2. Deteksi Daftar Makna (OL atau UL)
             if ((tagName === 'ol' || tagName === 'ul') && currentEntri) {
                 $(el).find('li').each((idx, li) => {
-                    // Hapus elemen yang bukan bagian dari definisi (tombol, link usulkan, dsb)
-                    $(li).find('.entrisButton, button, a').remove();
-
-                    // Ambil teks makna dan bersihkan spasi
+                    // Hapus link Tesaurus dan tombol usulkan
+                    $(li).find('a:contains("Tesaurus"), .entrisButton, button').remove();
+                    
                     let m = $(li).text().replace(/\s+/g, ' ').trim();
-
-                    // Daftar kalimat sampah/promosi untuk dibuang
-                    const sampah = [
-                        "memudahkan pencarian Anda",
-                        "hak berpartisipasi dalam pengayaan",
-                        "menampilkan hasil pencarian dengan tambahan informasi",
-                        "usulkan makna baru"
-                    ];
-
-                    // Cek apakah teks mengandung sampah
+                    const sampah = ["memudahkan pencarian Anda", "hak berpartisipasi dalam pengayaan", "usulkan makna baru"];
                     const isSampah = sampah.some(s => m.toLowerCase().includes(s.toLowerCase()));
 
-                    // Hanya masukkan jika ada teks dan bukan sampah
                     if (m && !isSampah) {
                         currentEntri.makna.push(m);
                     }
@@ -74,26 +64,28 @@ async function scrapeKBBI(kata, isRetry = false) {
             }
         });
 
-        // Push entri terakhir ke hasil
         if (currentEntri) hasil.push(currentEntri);
 
-        // --- LOGIKA LONCAT START ---
-        if (!isRetry && hasil.length > 0 && hasil[0].makna.length > 0) {
-            const maknaPertama = hasil[0].makna[0];
-            if (maknaPertama.includes('→')) {
-                const kataBaku = maknaPertama.replace('→', '').trim().split(' ')[0];
-                return await scrapeKBBI(kataBaku, true); 
+        // --- LOGIKA LONCAT SUPER AKURAT ---
+        if (!isRetry && hasil.length > 0) {
+            // Kita cari di semua makna entri pertama, apakah ada simbol panah?
+            const teksRujukan = hasil[0].makna.find(m => m.includes('→') || m.includes('->'));
+            
+            if (teksRujukan) {
+                // Ambil kata setelah panah. Kita pakai regex biar lebih aman
+                const match = teksRujukan.match(/→\s*([a-zA-Z]+)/) || teksRujukan.match(/->\s*([a-zA-Z]+)/);
+                if (match && match[1]) {
+                    const kataBaku = match[1].trim();
+                    console.log(`Auto-follow ke: ${kataBaku}`);
+                    return await scrapeKBBI(kataBaku, true); 
+                }
             }
         }
-        // --- LOGIKA LONCAT END ---
 
-        // Jika hasil kosong tapi tidak ada pesan error dari KBBI
-        if (hasil.length === 0) return { error: "Kata tidak ditemukan" };
-
-        return { data: hasil };
+        return { data: hasil.length > 0 ? hasil : [{ error: "Kata tidak ditemukan" }] };
 
     } catch (error) {
-        return { error: "Gagal menghubungi server KBBI" };
+        return { error: "Gagal menghubungi server" };
     }
 }
 
