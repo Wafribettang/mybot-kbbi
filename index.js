@@ -23,7 +23,7 @@ async function scrapeKBBI(kata) {
         $('.container.body-content').contents().each((i, el) => {
             const tagName = el.tagName;
 
-            // Jika ketemu judul (H2)
+            // 1. Deteksi Judul Kata (H2)
             if (tagName === 'h2') {
                 if (currentEntri) hasil.push(currentEntri);
                 currentEntri = {
@@ -33,19 +33,40 @@ async function scrapeKBBI(kata) {
                 };
             }
 
-            // Jika ketemu daftar makna
+            // 2. Deteksi Daftar Makna (OL atau UL)
             if ((tagName === 'ol' || tagName === 'ul') && currentEntri) {
                 $(el).find('li').each((idx, li) => {
-                    $(li).find('.entrisButton, button').remove();
+                    // Hapus elemen yang bukan bagian dari definisi (tombol, link usulkan, dsb)
+                    $(li).find('.entrisButton, button, a').remove();
+
+                    // Ambil teks makna dan bersihkan spasi
                     let m = $(li).text().replace(/\s+/g, ' ').trim();
-                    if (m && !m.toLowerCase().includes("usulkan makna")) {
+
+                    // Daftar kalimat sampah/promosi untuk dibuang
+                    const sampah = [
+                        "memudahkan pencarian Anda",
+                        "hak berpartisipasi dalam pengayaan",
+                        "menampilkan hasil pencarian dengan tambahan informasi",
+                        "usulkan makna baru"
+                    ];
+
+                    // Cek apakah teks mengandung sampah
+                    const isSampah = sampah.some(s => m.toLowerCase().includes(s.toLowerCase()));
+
+                    // Hanya masukkan jika ada teks dan bukan sampah
+                    if (m && !isSampah) {
                         currentEntri.makna.push(m);
                     }
                 });
             }
         });
 
+        // Push entri terakhir ke hasil
         if (currentEntri) hasil.push(currentEntri);
+
+        // Jika hasil kosong tapi tidak ada pesan error dari KBBI
+        if (hasil.length === 0) return { error: "Kata tidak ditemukan" };
+
         return { data: hasil };
 
     } catch (error) {
@@ -62,6 +83,11 @@ app.get('/kbbi', async (req, res) => {
     res.json(result);
 });
 
+// Endpoint untuk halaman utama agar tidak 404
+app.get('/', (req, res) => {
+    res.send("API KBBI Berhasil Online! Gunakan path /kbbi?kata=namakata");
+});
+
 app.listen(PORT, () => {
-    console.log(`API KBBI berjalan di http://localhost:${PORT}`);
+    console.log(`API KBBI berjalan di port ${PORT}`);
 });
