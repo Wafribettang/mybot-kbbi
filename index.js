@@ -54,7 +54,7 @@ async function scrapeKBBI(kata, isRetry = false) {
                     $(li).find('a:contains("Tesaurus"), .entrisButton, button').remove();
                     
                     let m = $(li).text().replace(/\s+/g, ' ').trim();
-                    const sampah = ["memudahkan pencarian Anda", "hak berpartisipasi dalam pengayaan", "usulkan makna baru"];
+                    const sampah = ["memudahkan pencarian Anda", "hak berpartisipasi dalam pengayaan", "usulkan makna baru", "menampilkan hasil pencarian dengan tambahan informasi yang lebih lengkap (misalnya, informasi etimologi)"];
                     const isSampah = sampah.some(s => m.toLowerCase().includes(s.toLowerCase()));
 
                     if (m && !isSampah) {
