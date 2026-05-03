@@ -16,6 +16,11 @@ async function scrapeKBBI(kata, isRetry = false) {
         const $ = cheerio.load(data);
         const pesanError = $('#errorMessageDiv').text().trim();
         if (pesanError) return { error: pesanError };
+        
+        const isiBody = $('.container.body-content').text();
+        if (isiBody.includes("Entri tidak ditemukan")) {
+            return { error: "Kata tidak ditemukan" };
+        }
 
         let hasil = [];
         let currentEntri = null;
