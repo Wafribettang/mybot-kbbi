@@ -34,6 +34,7 @@ async function scrapeKBBI(kata, isRetry = false, kataAsli = null) {
                 currentEntri = {
                     nama: judul.contents().filter(function() { return this.nodeType === 3; }).text().trim(),
                     nomor: judul.find('sup').text().trim() || null,
+                    info: null,
                     makna: []
                 };
 
@@ -71,7 +72,7 @@ async function scrapeKBBI(kata, isRetry = false, kataAsli = null) {
 
         if (currentEntri) hasil.push(currentEntri);
 
-                // --- LOGIKA LONCAT (Auto-Follow & Nama Override) ---
+                        // --- LOGIKA LONCAT (Auto-Follow & Info Property) ---
         if (!isRetry && hasil.length > 0) {
             const teksRujukan = hasil[0].makna.find(m => m.includes('→') || m.includes('->'));
             
@@ -79,18 +80,18 @@ async function scrapeKBBI(kata, isRetry = false, kataAsli = null) {
                 const match = teksRujukan.match(/→\s*([a-zA-Z]+)/) || teksRujukan.match(/->\s*([a-zA-Z]+)/);
                 if (match && match[1]) {
                     const kataBaku = match[1].trim();
-                    // Kita panggil lagi, tapi titipkan kata yang salah tadi ke 'kataAsli'
+                    // Panggil ulang dengan membawa parameter kata asli
                     return await scrapeKBBI(kataBaku, true, kata); 
                 }
             }
         }
 
-        // Jika ini adalah hasil loncatan (isRetry = true) dan ada kataAsli
+        // Jika ini hasil loncatan, timpa nama dan isi properti info
         if (isRetry && kataAsli && hasil.length > 0) {
             hasil = hasil.map(entry => ({
                 ...entry,
-                nama: kataAsli, // Timpa nama jadi 'jendral'
-                makna: [`(Bentuk tidak baku dari ${kata})`, ...entry.makna] // Tambah info di awal
+                nama: kataAsli, // Tetap gunakan kata yang diketik user (jendral)
+                info: `Bentuk tidak baku dari ${kata}` // Masuk ke properti info, bukan makna
             }));
         }
 
