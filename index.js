@@ -4,7 +4,7 @@ const cheerio = require('cheerio');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-async function scrapeKBBI(kata, isRetry = false) {
+async function scrapeKBBI(kata, isRetry = false, kataAsli = null) {
     try {
         const url = `https://kbbi.kemendikdasmen.go.id/entri/${encodeURIComponent(kata)}`;
         const { data } = await axios.get(url, {
@@ -71,20 +71,27 @@ async function scrapeKBBI(kata, isRetry = false) {
 
         if (currentEntri) hasil.push(currentEntri);
 
-        // --- LOGIKA LONCAT SUPER AKURAT ---
+                // --- LOGIKA LONCAT (Auto-Follow & Nama Override) ---
         if (!isRetry && hasil.length > 0) {
-            // Kita cari di semua makna entri pertama, apakah ada simbol panah?
             const teksRujukan = hasil[0].makna.find(m => m.includes('→') || m.includes('->'));
             
             if (teksRujukan) {
-                // Ambil kata setelah panah. Kita pakai regex biar lebih aman
                 const match = teksRujukan.match(/→\s*([a-zA-Z]+)/) || teksRujukan.match(/->\s*([a-zA-Z]+)/);
                 if (match && match[1]) {
                     const kataBaku = match[1].trim();
-                    console.log(`Auto-follow ke: ${kataBaku}`);
-                    return await scrapeKBBI(kataBaku, true); 
+                    // Kita panggil lagi, tapi titipkan kata yang salah tadi ke 'kataAsli'
+                    return await scrapeKBBI(kataBaku, true, kata); 
                 }
             }
+        }
+
+        // Jika ini adalah hasil loncatan (isRetry = true) dan ada kataAsli
+        if (isRetry && kataAsli && hasil.length > 0) {
+            hasil = hasil.map(entry => ({
+                ...entry,
+                nama: kataAsli, // Timpa nama jadi 'jendral'
+                makna: [`(Bentuk tidak baku dari ${kata})`, ...entry.makna] // Tambah info di awal
+            }));
         }
 
         return { data: hasil.length > 0 ? hasil : [{ error: "Kata tidak ditemukan" }] };
@@ -99,7 +106,8 @@ app.get('/kbbi', async (req, res) => {
     const kata = req.query.kata;
     if (!kata) return res.status(400).json({ error: "Parameter 'kata' diperlukan" });
 
-    const result = await scrapeKBBI(kata);
+    // Cukup panggil tanpa kataAsli, karena kataAsli akan diisi otomatis saat loncat
+    const result = await scrapeKBBI(kata); 
     res.json(result);
 });
 
